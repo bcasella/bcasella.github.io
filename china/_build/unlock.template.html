@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>China 2026</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🏯</text></svg>">
+<style>
+  :root{
+    --bg:#f6f4ef; --card:#fff; --fg:#1f1d1a; --muted:#6c675f;
+    --line:#e2ddd3; --accent:#b3261e; --accent-fg:#fff; --err:#b3261e;
+    --shadow:0 10px 40px rgba(31,29,26,.10);
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#141311; --card:#1e1c1a; --fg:#f2efe9; --muted:#a09a91;
+      --line:#312e2a; --accent:#e0554c; --accent-fg:#1a0d0c; --err:#ff8a80;
+      --shadow:0 10px 40px rgba(0,0,0,.45);
+    }
+  }
+  *{box-sizing:border-box}
+  html,body{height:100%}
+  body{
+    margin:0; background:var(--bg); color:var(--fg);
+    font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+    display:grid; place-items:center; padding:24px;
+  }
+  .card{
+    width:100%; max-width:23rem; background:var(--card); border:1px solid var(--line);
+    border-radius:18px; padding:28px 26px 24px; box-shadow:var(--shadow); text-align:center;
+  }
+  .lantern{font-size:44px; line-height:1; margin-bottom:10px}
+  h1{margin:0 0 4px; font-size:1.35rem; letter-spacing:-.01em}
+  .sub{margin:0 0 22px; color:var(--muted); font-size:.9rem}
+  form{display:grid; gap:12px; text-align:left}
+  label{font-size:.8rem; color:var(--muted); font-weight:600; letter-spacing:.02em}
+  input[type=password]{
+    width:100%; padding:12px 14px; font-size:1rem; font-family:inherit; color:var(--fg);
+    background:var(--bg); border:1px solid var(--line); border-radius:11px;
+  }
+  input[type=password]:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:transparent}
+  button{
+    padding:12px 14px; font:600 1rem/1 inherit; color:var(--accent-fg); background:var(--accent);
+    border:0; border-radius:11px; cursor:pointer;
+  }
+  button:disabled{opacity:.6; cursor:progress}
+  .remember{display:flex; gap:8px; align-items:center; font-size:.85rem; color:var(--muted)}
+  .remember input{accent-color:var(--accent); width:1rem; height:1rem}
+  .msg{min-height:1.2em; margin:2px 0 0; font-size:.85rem; color:var(--err)}
+  .msg.info{color:var(--muted)}
+  noscript{display:block; color:var(--err); font-size:.9rem}
+</style>
+</head>
+<body>
+
+<div class="card">
+  <div class="lantern">🏮</div>
+  <h1>China 2026</h1>
+  <p class="sub">Roteiro privado — introduz a palavra-passe.</p>
+
+  <form id="f" autocomplete="on">
+    <label for="pw">Palavra-passe</label>
+    <input id="pw" type="password" name="password" autocomplete="current-password"
+           autocapitalize="off" autocorrect="off" spellcheck="false" required autofocus>
+    <label class="remember"><input id="rem" type="checkbox" checked> Guardar neste dispositivo</label>
+    <button id="go" type="submit">Abrir roteiro</button>
+    <p class="msg" id="msg" role="status" aria-live="polite"></p>
+  </form>
+
+  <noscript>Esta página precisa de JavaScript para desencriptar o roteiro.</noscript>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  var P = __PAYLOAD__;
+  var STORE = "china2026.pw";
+
+  var form = document.getElementById("f");
+  var pw = document.getElementById("pw");
+  var rem = document.getElementById("rem");
+  var go = document.getElementById("go");
+  var msg = document.getElementById("msg");
+
+  function say(text, info) {
+    msg.textContent = text || "";
+    msg.className = "msg" + (info ? " info" : "");
+  }
+
+  function b64(s) {
+    var raw = atob(s), out = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+    return out;
+  }
+
+  // AES-256-GCM, chave derivada da palavra-passe por PBKDF2-SHA256.
+  function decrypt(password) {
+    var subtle = window.crypto && window.crypto.subtle;
+    if (!subtle) {
+      return Promise.reject(new Error(
+        "O browser não permite desencriptar aqui — abre a página por https://."));
+    }
+    return subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"])
+      .then(function (material) {
+        return subtle.deriveKey(
+          { name: "PBKDF2", salt: b64(P.salt), iterations: P.iter, hash: "SHA-256" },
+          material, { name: "AES-GCM", length: 256 }, false, ["decrypt"]);
+      })
+      .then(function (key) {
+        return subtle.decrypt({ name: "AES-GCM", iv: b64(P.iv) }, key, b64(P.ct));
+      })
+      .then(function (plain) {
+        return new TextDecoder().decode(plain);
+      });
+  }
+
+  function render(html) {
+    document.open();
+    document.write(html);
+    document.close();
+  }
+
+  function unlock(password, silent) {
+    go.disabled = true;
+    say(silent ? "A abrir…" : "A desencriptar…", true);
+    return decrypt(password).then(function (html) {
+      try {
+        if (rem.checked) localStorage.setItem(STORE, password);
+        else localStorage.removeItem(STORE);
+      } catch (e) {}
+      render(html);
+    }).catch(function (err) {
+      go.disabled = false;
+      try { localStorage.removeItem(STORE); } catch (e) {}
+      if (/https/.test(err && err.message)) say(err.message);
+      else say(silent ? "A palavra-passe guardada já não serve." : "Palavra-passe errada.");
+      pw.value = "";
+      pw.focus();
+    });
+  }
+
+  form.addEventListener("submit", function (e) {
+    e.preventDefault();
+    if (pw.value) unlock(pw.value, false);
+  });
+
+  // Já desbloqueado antes neste dispositivo? Entra logo.
+  var saved = null;
+  try { saved = localStorage.getItem(STORE); } catch (e) {}
+  if (saved) unlock(saved, true);
+})();
+</script>
+
+</body>
+</html>
